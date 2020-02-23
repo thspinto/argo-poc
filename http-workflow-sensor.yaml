@@ -1,0 +1,126 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: webhook-event-source
+spec:
+  type: "webhook"
+  webhook:
+    # gateway can run multiple HTTP servers. Simply define a unique port to start a new HTTP server
+    example:
+      # port to run HTTP server on
+      port: "12000"
+      # endpoint to listen to
+      endpoint: "/example"
+      # HTTP request method to allow. In this case, only POST requests are accepted
+      method: "POST"
+
+# Uncomment to use secure webhook
+#    example-secure:
+#      port: "13000"
+#      endpoint: "/secure"
+#      method: "POST"
+#      # path to file that is mounted in gateway pod which contains certs
+#      serverCertPath: "/bin/webhook-secure/crt"
+#      # path to file that is mounted in gateway pod which contains private key
+#      serverKeyPath: "/bin/webhook-secure/key"
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Gateway
+metadata:
+  name: webhook-gateway
+  labels:
+    # gateway controller with instanceId "argo-events" will process this gateway
+    gateways.argoproj.io/gateway-controller-instanceid: argo-events
+spec:
+  replica: 1
+  type: webhook
+  eventSourceRef:
+    name: webhook-event-source
+  template:
+    metadata:
+      name: webhook-gateway
+      labels:
+        gateway-name: webhook-gateway
+    spec:
+      containers:
+        - name: gateway-client
+          image: argoproj/gateway-client:v0.12
+          imagePullPolicy: Always
+          command: ["/bin/gateway-client"]
+        - name: webhook-events
+          image: argoproj/webhook-gateway:v0.12
+          imagePullPolicy: Always
+          command: ["/bin/webhook-gateway"]
+      serviceAccountName: argo-events-sa
+  service:
+    metadata:
+      name: webhook-gateway-svc
+    spec:
+      selector:
+        gateway-name: webhook-gateway
+      ports:
+        - port: 12000
+          targetPort: 12000
+      type: LoadBalancer
+  subscribers:
+    http:
+      - "http://webhook-sensor.argo-events.svc:9300/"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: webhook-sensor
+  labels:
+    sensors.argoproj.io/sensor-controller-instanceid: argo-events
+spec:
+  template:
+    spec:
+      containers:
+        - name: sensor
+          image: argoproj/sensor:v0.12
+          imagePullPolicy: Always
+      serviceAccountName: argo-events-sa
+  dependencies:
+    - name: test-dep
+      gatewayName: webhook-gateway
+      eventName: example
+  subscription:
+    http:
+      port: 9300
+  triggers:
+    - template:
+        name: webhook-workflow-trigger
+        k8s:
+          group: argoproj.io
+          version: v1alpha1
+          resource: workflows
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: webhook-
+              spec:
+                entrypoint: whalesay
+                arguments:
+                  parameters:
+                  - name: message
+                    # the value will get overridden by event payload from test-dep
+                    value: hello world
+                templates:
+                - name: whalesay
+                  serviceAccountName: argo-events-sa
+                  inputs:
+                    parameters:
+                    - name: message
+                  container:
+                    image: docker/whalesay:latest
+                    command: [cowsay]
+                    args: ["{{inputs.parameters.message}}"]
+          parameters:
+            - src:
+                dependencyName: test-dep
+              dest: spec.arguments.parameters.0.value

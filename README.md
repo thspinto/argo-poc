@@ -60,8 +60,20 @@ References:
 
 1. Triggering events using argo events
 
-  * Show integration with Fission (Kafka or SQS)
   * Show integration with Workflows (Github webhook)
+```bash
+kubectl -n argo-events -f http-workflow-sensor.yaml
+kubectl -n port-forward svc/webhook-gateway-svc 12000:12000
+curl -d '{"message":"this is my first webhook"}' -H "Content-Type: application/json" -X POST http://localhost:12000/example
+```
+To check the workflow status and logs run:
+```bash
+argo list -n argo-events
+argo -n argo-events logs <workflow-id>
+```
+
+  * Show integration with Fission (Kafka or SQS)
+
 
 1. Global CI pipelines
 
