@@ -3,6 +3,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: EventSource
 metadata:
   name: webhook-event-source
+  namespace: argo-events
 spec:
   type: "webhook"
   webhook:
@@ -30,6 +31,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Gateway
 metadata:
   name: webhook-gateway
+  namespace: argo-events
   labels:
     # gateway controller with instanceId "argo-events" will process this gateway
     gateways.argoproj.io/gateway-controller-instanceid: argo-events
@@ -72,6 +74,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: webhook-sensor
+  namespace: argo-events
   labels:
     sensors.argoproj.io/sensor-controller-instanceid: argo-events
 spec:
@@ -124,3 +127,11 @@ spec:
             - src:
                 dependencyName: test-dep
               dest: spec.arguments.parameters.0.value
+    - template:
+        name: webhook-fission-trigger
+        http:
+          serverURL: http://router.fission.svc.cluster.local/hello
+          method: GET
+          payload:
+            - src:
+                dependencyName: test-dep

@@ -1,20 +1,19 @@
+---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: fission
   labels:
     name: fission
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
 ---
-# Source: fission-all/templates/deployment.yaml
-
 apiVersion: v1
 kind: Namespace
 metadata:
   name: fission-function
   labels:
     name: fission-function
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
 
 ---
 apiVersion: v1
@@ -23,7 +22,8 @@ metadata:
   name: fission-builder
   labels:
     name: fission-builder
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -97,6 +97,7 @@ kind: ServiceAccount
 metadata:
   name: fission-fetcher
   namespace: fission-function
+
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -111,15 +112,16 @@ metadata:
   name: feature-config
   namespace: fission
 data:
-  "config.yaml": Y2FuYXJ5OgogIGVuYWJsZWQ6IHRydWUKICBwcm9tZXRoZXVzU3ZjOiAiaHR0cDovL2Zpc3Npb24tMS04LTAtcHJvbWV0aGV1cy1zZXJ2ZXIuZmlzc2lvbiIK
+  "config.yaml": Y2FuYXJ5OgogIGVuYWJsZWQ6IGZhbHNlCiAgcHJvbWV0aGV1c1N2YzogIiIK
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller
+  namespace: fission
   labels:
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
     svc: controller
     application: fission-api
 spec:
@@ -141,18 +143,16 @@ spec:
         command: ["/fission-bundle"]
         args: ["--controllerPort", "8888"]
         env:
-        - name: FISSION_FUNCTION_NAMESPACE
-          value: "fission-function"
-        - name: TRACE_JAEGER_COLLECTOR_ENDPOINT
-          value: ""
-        - name: TRACING_SAMPLING_RATE
-          value: "0.5"
-        - name: DEBUG_ENV
-          value: "false"
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
+          - name: TRACE_JAEGER_COLLECTOR_ENDPOINT
+            value: ""
+          - name: TRACING_SAMPLING_RATE
+            value: "0.5"
+          - name: FISSION_FUNCTION_NAMESPACE
+            value: "fission-function"
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
         readinessProbe:
           httpGet:
             path: "/healthz"
@@ -179,13 +179,15 @@ spec:
         configMap:
           name: feature-config
 
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: executor
+  namespace: fission
   labels:
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
     svc: executor
 spec:
   replicas: 1
@@ -210,18 +212,18 @@ spec:
         env:
         - name: FETCHER_IMAGE
           value: "fission/fetcher:1.8.0"
-        - name: FETCHER_IMAGE_PULL_POLICY
-          value: "IfNotPresent"
         - name: RUNTIME_IMAGE_PULL_POLICY
           value: "IfNotPresent"
-        - name: ADOPT_EXISTING_RESOURCES
-          value: "false"
-        - name: ENABLE_ISTIO
-          value: "false"
+        - name: FETCHER_IMAGE_PULL_POLICY
+          value: "IfNotPresent"
         - name: TRACE_JAEGER_COLLECTOR_ENDPOINT
           value: ""
         - name: TRACING_SAMPLING_RATE
           value: "0.5"
+        - name: ADOPT_EXISTING_RESOURCES
+          value: "false"
+        - name: ENABLE_ISTIO
+          value: "false"
         - name: FETCHER_MINCPU
           value: "10m"
         - name: FETCHER_MINMEM
@@ -230,8 +232,6 @@ spec:
           value: ""
         - name: FETCHER_MAXMEM
           value: ""
-        - name: DEBUG_ENV
-          value: "false"
         readinessProbe:
           httpGet:
             path: "/healthz"
@@ -246,10 +246,10 @@ spec:
           initialDelaySeconds: 35
           periodSeconds: 5
         ports:
-        - containerPort: 8080
-          name: metrics
-        - containerPort: 8888
-          name: http
+          - containerPort: 8080
+            name: metrics
+          - containerPort: 8888
+            name: http
       serviceAccountName: fission-svc
 
 ---
@@ -257,8 +257,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: buildermgr
+  namespace: fission
   labels:
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
     svc: buildermgr
 spec:
   replicas: 1
@@ -283,12 +284,12 @@ spec:
           value: "IfNotPresent"
         - name: BUILDER_IMAGE_PULL_POLICY
           value: "IfNotPresent"
-        - name: ENABLE_ISTIO
-          value: "false"
         - name: TRACE_JAEGER_COLLECTOR_ENDPOINT
           value: ""
         - name: TRACING_SAMPLING_RATE
           value: "0.5"
+        - name: ENABLE_ISTIO
+          value: "false"
         - name: FETCHER_MINCPU
           value: "10m"
         - name: FETCHER_MINMEM
@@ -297,8 +298,6 @@ spec:
           value: ""
         - name: FETCHER_MAXMEM
           value: ""
-        - name: DEBUG_ENV
-          value: "false"
       serviceAccountName: fission-svc
 
 ---
@@ -306,8 +305,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kubewatcher
+  namespace: fission
   labels:
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
     svc: kubewatcher
 spec:
   replicas: 1
@@ -330,68 +330,16 @@ spec:
           value: ""
         - name: TRACING_SAMPLING_RATE
           value: "0.5"
-        - name: DEBUG_ENV
-          value: "false"
       serviceAccountName: fission-svc
 
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: influxdb
-  labels:
-    svc: influxdb
-    chart: "fission-all-1.8.0"
-spec:
-  type: ClusterIP
-  ports:
-  - port: 8086
-    targetPort: 8086
-  selector:
-    svc: influxdb
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: influxdb
-  labels:
-    chart: "fission-all-1.8.0"
-    svc: influxdb
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      svc: influxdb
-  template:
-    metadata:
-      labels:
-        svc: influxdb
-    spec:
-      containers:
-      - name: influxdb
-        image: fission/influxdb
-        imagePullPolicy: IfNotPresent
-        env:
-        - name: PRE_CREATE_DB
-          value: fissionFunctionLog
-        - name: ADMIN_USER
-          valueFrom:
-            secretKeyRef:
-              name: influxdb
-              key: username
-        - name: INFLUXDB_INIT_PWD
-          valueFrom:
-            secretKeyRef:
-              name: influxdb
-              key: password
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: timer
+  namespace: fission
   labels:
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
     svc: timer
 spec:
   replicas: 1
@@ -410,128 +358,20 @@ spec:
         command: ["/fission-bundle"]
         args: ["--timer", "--routerUrl", "http://router.fission"]
         env:
-        - name: DEBUG_ENV
-          value: "false"
-      serviceAccountName: fission-svc
-
-#
-# This is commented out until fission-ui allows configuring the
-# namespace. Right now it just crashes if Release.Namespace !=
-# "fission".
-#
-#---
-#apiVersion: apps/v1
-#kind: Deployment
-#metadata:
-#  name: fission-ui
-#  labels:
-#    chart: "fission-all-1.8.0"
-#spec:
-#  replicas: 1
-#  template:
-#    metadata:
-#      labels:
-#        svc: fission-ui
-#    spec:
-#      containers:
-#      - name: nginx
-#        image: index.docker.io/
-#        imagePullPolicy: IfNotPresent
-#      - name: kubectl-proxy
-#        image: index.docker.io/lachlanevenson/k8s-kubectl
-#        args: ["proxy", "--port", "8001", "--address", "127.0.0.1"]
-#      serviceAccountName: fission-svc
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    svc: nats-streaming
-  name: nats-streaming
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      svc: nats-streaming
-  template:
-    metadata:
-      labels:
-        svc: nats-streaming
-    spec:
-      containers:
-      - name: nats-streaming
-        image: nats-streaming
-        imagePullPolicy: IfNotPresent
-        args: [
-          "--cluster_id", "fissionMQTrigger",
-          "--auth", "defaultFissionAuthToken",
-          "--max_channels", "0",
-          "--http_port", "4223"
-        ]
-        ports:
-        - containerPort: 4222
-          protocol: TCP
-        - containerPort: 4223
-          protocol: TCP
-        readinessProbe:
-          httpGet:
-            path: "/streaming/serverz"
-            port: 4223
-          initialDelaySeconds: 30
-          periodSeconds: 1
-          failureThreshold: 30
-        livenessProbe:
-          httpGet:
-            path: "/streaming/serverz"
-            port: 4223
-          initialDelaySeconds: 30
-          periodSeconds: 5
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mqtrigger-nats-streaming
-  labels:
-    chart: "fission-all-1.8.0"
-    svc: mqtrigger
-    messagequeue: nats-streaming
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      svc: mqtrigger
-      messagequeue: nats-streaming
-  template:
-    metadata:
-      labels:
-        svc: mqtrigger
-        messagequeue: nats-streaming
-    spec:
-      containers:
-      - name: mqtrigger
-        image: "index.docker.io/fission/fission-bundle:1.8.0"
-        imagePullPolicy: IfNotPresent
-        command: ["/fission-bundle"]
-        args: ["--mqt", "--routerUrl", "http://router.fission"]
-        env:
-        - name: MESSAGE_QUEUE_TYPE
-          value: nats-streaming
-        - name: MESSAGE_QUEUE_URL
-          value: nats://defaultFissionAuthToken@nats-streaming:4222
         - name: TRACE_JAEGER_COLLECTOR_ENDPOINT
           value: ""
         - name: TRACING_SAMPLING_RATE
           value: "0.5"
-        - name: DEBUG_ENV
-          value: "false"
       serviceAccountName: fission-svc
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: storagesvc
+  namespace: fission
   labels:
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
     svc: storagesvc
     application: fission-storage
 spec:
@@ -553,30 +393,15 @@ spec:
         command: ["/fission-bundle"]
         args: ["--storageServicePort", "8000", "--filePath", "/fission"]
         env:
+        - name: PRUNE_INTERVAL
+          value: "60"
         - name: TRACE_JAEGER_COLLECTOR_ENDPOINT
           value: ""
         - name: TRACING_SAMPLING_RATE
           value: "0.5"
-        - name: PRUNE_INTERVAL
-          value: "60"
-        - name: DEBUG_ENV
-          value: "false"
         volumeMounts:
         - name: fission-storage
           mountPath: /fission
-        readinessProbe:
-          httpGet:
-            path: "/healthz"
-            port: 8000
-          initialDelaySeconds: 1
-          periodSeconds: 1
-          failureThreshold: 30
-        livenessProbe:
-          httpGet:
-            path: "/healthz"
-            port: 8000
-          initialDelaySeconds: 35
-          periodSeconds: 5
         ports:
           - containerPort: 8000
             name: http
@@ -587,480 +412,16 @@ spec:
           claimName: fission-storage-pvc
 
 ---
-# Source: fission-all/templates/secrets.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: influxdb
-  labels:
-    chart: "fission-all-1.8.0"
-type: Opaque
-data:
-  username: "YWRtaW4="
-  password: "V1hmcDVtbHRkRWpGRkk5WGo3dTk="
-
----
-# Source: fission-all/charts/prometheus/templates/alertmanager-configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  labels:
-    component: "alertmanager"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-alertmanager
-data:
-  alertmanager.yml: |
-    global: {}
-    receivers:
-    - name: default-receiver
-    route:
-      group_interval: 5m
-      group_wait: 10s
-      receiver: default-receiver
-      repeat_interval: 3h
-
----
-# Source: fission-all/charts/prometheus/templates/server-configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  labels:
-    component: "server"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-server
-data:
-  alerts: |
-    groups:
-
-  prometheus.yml: |
-    global:
-      evaluation_interval: 1m
-      scrape_interval: 1m
-      scrape_timeout: 10s
-    rule_files:
-    - /etc/config/rules
-    - /etc/config/alerts
-    scrape_configs:
-    - job_name: prometheus
-      static_configs:
-      - targets:
-        - localhost:9090
-    - bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      job_name: kubernetes-apiservers
-      kubernetes_sd_configs:
-      - role: endpoints
-      relabel_configs:
-      - action: keep
-        regex: default;kubernetes;https
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __meta_kubernetes_service_name
-        - __meta_kubernetes_endpoint_port_name
-      scheme: https
-      tls_config:
-        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        insecure_skip_verify: true
-    - bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      job_name: kubernetes-nodes
-      kubernetes_sd_configs:
-      - role: node
-      relabel_configs:
-      - action: labelmap
-        regex: __meta_kubernetes_node_label_(.+)
-      - replacement: kubernetes.default.svc:443
-        target_label: __address__
-      - regex: (.+)
-        replacement: /api/v1/nodes/$1/proxy/metrics
-        source_labels:
-        - __meta_kubernetes_node_name
-        target_label: __metrics_path__
-      scheme: https
-      tls_config:
-        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        insecure_skip_verify: true
-    - bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      job_name: kubernetes-nodes-cadvisor
-      kubernetes_sd_configs:
-      - role: node
-      relabel_configs:
-      - action: labelmap
-        regex: __meta_kubernetes_node_label_(.+)
-      - replacement: kubernetes.default.svc:443
-        target_label: __address__
-      - regex: (.+)
-        replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
-        source_labels:
-        - __meta_kubernetes_node_name
-        target_label: __metrics_path__
-      scheme: https
-      tls_config:
-        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        insecure_skip_verify: true
-    - job_name: kubernetes-service-endpoints
-      kubernetes_sd_configs:
-      - role: endpoints
-      relabel_configs:
-      - action: keep
-        regex: true
-        source_labels:
-        - __meta_kubernetes_service_annotation_prometheus_io_scrape
-      - action: replace
-        regex: (https?)
-        source_labels:
-        - __meta_kubernetes_service_annotation_prometheus_io_scheme
-        target_label: __scheme__
-      - action: replace
-        regex: (.+)
-        source_labels:
-        - __meta_kubernetes_service_annotation_prometheus_io_path
-        target_label: __metrics_path__
-      - action: replace
-        regex: ([^:]+)(?::\d+)?;(\d+)
-        replacement: $1:$2
-        source_labels:
-        - __address__
-        - __meta_kubernetes_service_annotation_prometheus_io_port
-        target_label: __address__
-      - action: labelmap
-        regex: __meta_kubernetes_service_label_(.+)
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: kubernetes_namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_service_name
-        target_label: kubernetes_name
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: kubernetes_node
-    - honor_labels: true
-      job_name: prometheus-pushgateway
-      kubernetes_sd_configs:
-      - role: service
-      relabel_configs:
-      - action: keep
-        regex: pushgateway
-        source_labels:
-        - __meta_kubernetes_service_annotation_prometheus_io_probe
-    - job_name: kubernetes-services
-      kubernetes_sd_configs:
-      - role: service
-      metrics_path: /probe
-      params:
-        module:
-        - http_2xx
-      relabel_configs:
-      - action: keep
-        regex: true
-        source_labels:
-        - __meta_kubernetes_service_annotation_prometheus_io_probe
-      - source_labels:
-        - __address__
-        target_label: __param_target
-      - replacement: blackbox
-        target_label: __address__
-      - source_labels:
-        - __param_target
-        target_label: instance
-      - action: labelmap
-        regex: __meta_kubernetes_service_label_(.+)
-      - source_labels:
-        - __meta_kubernetes_namespace
-        target_label: kubernetes_namespace
-      - source_labels:
-        - __meta_kubernetes_service_name
-        target_label: kubernetes_name
-    - job_name: kubernetes-pods
-      kubernetes_sd_configs:
-      - role: pod
-      relabel_configs:
-      - action: keep
-        regex: true
-        source_labels:
-        - __meta_kubernetes_pod_annotation_prometheus_io_scrape
-      - action: replace
-        regex: (.+)
-        source_labels:
-        - __meta_kubernetes_pod_annotation_prometheus_io_path
-        target_label: __metrics_path__
-      - action: replace
-        regex: ([^:]+)(?::\d+)?;(\d+)
-        replacement: $1:$2
-        source_labels:
-        - __address__
-        - __meta_kubernetes_pod_annotation_prometheus_io_port
-        target_label: __address__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: kubernetes_namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: kubernetes_pod_name
-
-    alerting:
-      alertmanagers:
-      - kubernetes_sd_configs:
-          - role: pod
-        tls_config:
-          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-        relabel_configs:
-        - source_labels: [__meta_kubernetes_namespace]
-          regex: fission
-          action: keep
-        - source_labels: [__meta_kubernetes_pod_label_app]
-          regex: prometheus
-          action: keep
-        - source_labels: [__meta_kubernetes_pod_label_component]
-          regex: alertmanager
-          action: keep
-        - source_labels: [__meta_kubernetes_pod_container_port_number]
-          regex:
-          action: drop
-  rules: |
-    {}
-
----
-# Source: fission-all/templates/fluentbit.yaml
-# Fluentbit deployment for Fission
-#
-# Requires:
-# - service account: fission-svc
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: fission-1-8-0-fission-fluentbit
-data:
-  fluentbit.conf: |
-   # Some stuff in this file is copied out of https://github.com/fluent/fluent-bit-kubernetes-logging/blob/master/output/kafka/fluent-bit-configmap.yaml
-   [SERVICE]
-       Flush 5
-       Log_Level info
-       Parsers_File parsers.conf
-
-   [INPUT]
-       Name tail
-       Tag log.*
-       Path ${LOG_PATH}
-       Mem_Buf_Limit 5MB
-       Parser docker
-       DB /var/log/fission/flb_kube.db
-       Skip_Long_Lines   On
-       Refresh_Interval  10
-
-   [FILTER]
-       Name kubernetes
-       Match log.*
-       Kube_URL https://kubernetes.default.svc.cluster.local:443
-
-   #
-   # Flatten kubernetes labels so we can tag and query functionuid with influxdb
-   #
-   [FILTER]
-       Name nest
-       Match log.*
-       Operation lift
-       Nested_under kubernetes
-       Prefix_with kubernetes_
-
-   [FILTER]
-       Name nest
-       Match log.*
-       Operation lift
-       Nested_under kubernetes_labels
-       Prefix_with kubernetes_labels_
-
-   [OUTPUT]
-       Name influxdb
-       Match log.*
-       Host ${INFLUXDB_ADDRESS}
-       Port ${INFLUXDB_PORT}
-       Database ${INFLUXDB_DBNAME}
-       HTTP_User ${INFLUXDB_USERNAME}
-       HTTP_Passwd ${INFLUXDB_PASSWD}
-       Tag_Keys kubernetes_labels_functionUid
-       Sequence_Tag  _seq
-
-
-   # Useful for testing config changes
-   #[OUTPUT]
-   #    Name file
-   #    Match log.*
-   #    Path /flbout.txt
-
-
-  parsers.conf: |
-   [PARSER]
-       Name        docker
-       Format      json
-       Time_Key    time
-       Time_Format %Y-%m-%dT%H:%M:%S.%L
-       Time_Keep   On
-
-       # next bit is useful when the logs from the function itself are in json
-       # Command      |  Decoder | Field | Optional Action
-       # =============|==================|=================
-       #Decode_Field_As   escaped    log
-
-
-
----
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: logger
-  labels:
-    chart: "fission-all-1.8.0"
-    svc: logger
-spec:
-  selector:
-    matchLabels:
-      svc: logger
-  template:
-    metadata:
-      labels:
-        svc: logger
-    spec:
-      initContainers:
-        - name: init
-          image: busybox
-          imagePullPolicy: IfNotPresent
-          command: ['mkdir', '-p', '/var/log/fission']
-          volumeMounts:
-            - name: container-log
-              mountPath: /var/log/
-              readOnly: false
-      containers:
-        - name: logger
-
-          image: "index.docker.io/fission/fission-bundle:1.8.0"
-
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: spec.nodeName
-          command: ["/fission-bundle"]
-          args: ["--logger"]
-          volumeMounts:
-            - name: container-log
-              mountPath: /var/log/
-              readOnly: false
-            - name: docker-log
-              mountPath: /var/lib/docker/containers
-              readOnly: true
-        - name: fluentbit
-          image: "index.docker.io/fluent/fluent-bit:1.0.4"
-
-          imagePullPolicy: IfNotPresent
-          # CMD ["/fluent-bit/bin/fluent-bit", "-c", "/fluent-bit/etc/fluent-bit.conf"]
-          command: ["/fluent-bit/bin/fluent-bit", "-c", "/fluent-bit/etc/fluentbit.conf"]
-          env:
-            - name: INFLUXDB_ADDRESS
-              value: influxdb
-            - name: INFLUXDB_PORT
-              value: "8086"
-            - name: INFLUXDB_DBNAME
-              value: "fissionFunctionLog"
-            - name: INFLUXDB_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: influxdb
-                  key: username
-            - name: INFLUXDB_PASSWD
-              valueFrom:
-                secretKeyRef:
-                  name: influxdb
-                  key: password
-            - name: LOG_PATH
-              value: /var/log/fission/*.log
-          volumeMounts:
-            - name: container-log
-              mountPath: /var/log/
-              readOnly: false
-            - name: docker-log
-              mountPath: /var/lib/docker/containers
-              readOnly: true
-            - name: fluentbit-config
-              mountPath: /fluent-bit/etc/
-              readOnly: true
-      serviceAccountName: fission-svc
-      volumes:
-        - name: container-log
-          hostPath:
-            path: /var/log/
-        - name: docker-log
-          hostPath:
-            path: /var/lib/docker/containers
-        # Fluentbit config location: /fluent-bit/etc/*.conf
-        - name: fluentbit-config
-          configMap:
-            name: fission-1-8-0-fission-fluentbit
-  updateStrategy:
-    type: RollingUpdate
-
----
-# Source: fission-all/charts/prometheus/templates/alertmanager-pvc.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  labels:
-    component: "alertmanager"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-alertmanager
-spec:
-  accessModes:
-    - ReadWriteOnce
-
-  resources:
-    requests:
-      storage: "2Gi"
----
-# Source: fission-all/charts/prometheus/templates/server-pvc.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  labels:
-    component: "server"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-server
-spec:
-  accessModes:
-    - ReadWriteOnce
-
-  resources:
-    requests:
-      storage: "8Gi"
----
-# Source: fission-all/templates/pvc.yaml
+# Source: fission-core/templates/pvc.yaml
 
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: fission-storage-pvc
+  namespace: fission
   labels:
     app: fission-storage
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
     release: "fission-1-8-0"
 spec:
   accessModes:
@@ -1070,453 +431,21 @@ spec:
       storage: "8Gi"
 
 ---
-# Source: fission-all/charts/prometheus/templates/alertmanager-serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    component: "alertmanager"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-alertmanager
----
-# Source: fission-all/charts/prometheus/templates/kube-state-metrics-serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    component: "kube-state-metrics"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-kube-state-metrics
----
-# Source: fission-all/charts/prometheus/templates/node-exporter-serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    component: "node-exporter"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-node-exporter
----
-# Source: fission-all/charts/prometheus/templates/pushgateway-serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    component: "pushgateway"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-pushgateway
----
-# Source: fission-all/charts/prometheus/templates/server-serviceaccount.yaml
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    component: "server"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-server
-
----
-# Source: fission-all/charts/prometheus/templates/alertmanager-clusterrole.yaml
-
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRole
-metadata:
-  labels:
-    component: "alertmanager"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-alertmanager
-rules:
-
----
-# Source: fission-all/charts/prometheus/templates/kube-state-metrics-clusterrole.yaml
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRole
-metadata:
-  labels:
-    component: "kube-state-metrics"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-kube-state-metrics
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - namespaces
-      - nodes
-      - persistentvolumeclaims
-      - pods
-      - services
-      - resourcequotas
-      - replicationcontrollers
-      - limitranges
-      - persistentvolumeclaims
-      - persistentvolumes
-      - endpoints
-      - secrets
-      - configmaps
-    verbs:
-      - list
-      - watch
-  - apiGroups:
-      - extensions
-    resources:
-      - daemonsets
-      - deployments
-      - ingresses
-      - replicasets
-    verbs:
-      - list
-      - watch
-  - apiGroups:
-      - apps
-    resources:
-      - daemonsets
-      - deployments
-      - statefulsets
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - batch
-    resources:
-      - cronjobs
-      - jobs
-    verbs:
-      - list
-      - watch
-  - apiGroups:
-      - autoscaling
-    resources:
-      - horizontalpodautoscalers
-    verbs:
-      - list
-      - watch
-  - apiGroups:
-      - policy
-    resources:
-      - poddisruptionbudgets
-    verbs:
-      - list
-      - watch
-  - apiGroups:
-      - certificates.k8s.io
-    resources:
-      - certificatesigningrequests
-    verbs:
-      - list
-      - watch
-
----
-# Source: fission-all/charts/prometheus/templates/pushgateway-clusterrole.yaml
-
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRole
-metadata:
-  labels:
-    component: "pushgateway"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-pushgateway
-rules:
-
----
-# Source: fission-all/charts/prometheus/templates/server-clusterrole.yaml
-
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRole
-metadata:
-  labels:
-    component: "server"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-server
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - nodes
-      - nodes/proxy
-      - nodes/metrics
-      - services
-      - endpoints
-      - pods
-      - ingresses
-      - configmaps
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - "extensions"
-    resources:
-      - ingresses/status
-      - ingresses
-    verbs:
-      - get
-      - list
-      - watch
-  - nonResourceURLs:
-      - "/metrics"
-    verbs:
-      - get
-
----
-# Source: fission-all/charts/prometheus/templates/alertmanager-clusterrolebinding.yaml
-
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    component: "alertmanager"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-alertmanager
-subjects:
-  - kind: ServiceAccount
-    name: fission-1-8-0-prometheus-alertmanager
-    namespace: fission
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: fission-1-8-0-prometheus-alertmanager
-
----
-# Source: fission-all/charts/prometheus/templates/kube-state-metrics-clusterrolebinding.yaml
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    component: "kube-state-metrics"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-kube-state-metrics
-subjects:
-  - kind: ServiceAccount
-    name: fission-1-8-0-prometheus-kube-state-metrics
-    namespace: fission
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: fission-1-8-0-prometheus-kube-state-metrics
----
-# Source: fission-all/charts/prometheus/templates/pushgateway-clusterrolebinding.yaml
-
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    component: "pushgateway"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-pushgateway
-subjects:
-  - kind: ServiceAccount
-    name: fission-1-8-0-prometheus-pushgateway
-    namespace: fission
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: fission-1-8-0-prometheus-pushgateway
-
----
-# Source: fission-all/charts/prometheus/templates/server-clusterrolebinding.yaml
-
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    component: "server"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-server
-subjects:
-  - kind: ServiceAccount
-    name: fission-1-8-0-prometheus-server
-    namespace: fission
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: fission-1-8-0-prometheus-server
-
----
-# Source: fission-all/charts/prometheus/templates/alertmanager-service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    component: "alertmanager"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-alertmanager
-spec:
-  ports:
-    - name: http
-      port: 80
-      protocol: TCP
-      targetPort: 9093
-  selector:
-    component: "alertmanager"
-    app: prometheus
-    release: fission-1-8-0
-  type: "ClusterIP"
-
----
-# Source: fission-all/charts/prometheus/templates/kube-state-metrics-svc.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    prometheus.io/scrape: "true"
-
-  labels:
-    component: "kube-state-metrics"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-kube-state-metrics
-spec:
-  clusterIP: None
-  ports:
-    - name: http
-      port: 80
-      protocol: TCP
-      targetPort: 8080
-  selector:
-    component: "kube-state-metrics"
-    app: prometheus
-    release: fission-1-8-0
-  type: "ClusterIP"
-
----
-# Source: fission-all/charts/prometheus/templates/node-exporter-service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    prometheus.io/scrape: "true"
-
-  labels:
-    component: "node-exporter"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-node-exporter
-spec:
-  clusterIP: None
-  ports:
-    - name: metrics
-      port: 9100
-      protocol: TCP
-      targetPort: 9100
-  selector:
-    component: "node-exporter"
-    app: prometheus
-    release: fission-1-8-0
-  type: "ClusterIP"
----
-# Source: fission-all/charts/prometheus/templates/pushgateway-service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    prometheus.io/probe: pushgateway
-
-  labels:
-    component: "pushgateway"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-pushgateway
-spec:
-  ports:
-    - name: http
-      port: 9091
-      protocol: TCP
-      targetPort: 9091
-  selector:
-    component: "pushgateway"
-    app: prometheus
-    release: fission-1-8-0
-  type: "ClusterIP"
-
----
-# Source: fission-all/charts/prometheus/templates/server-service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    component: "server"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-server
-spec:
-  ports:
-    - name: http
-      port: 80
-      protocol: TCP
-      targetPort: 9090
-  selector:
-    component: "server"
-    app: prometheus
-    release: fission-1-8-0
-  type: "ClusterIP"
----
-# Source: fission-all/templates/svc.yaml
+# Source: fission-core/templates/svc.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: router
+  namespace: fission
   labels:
     svc: router
     application: fission-router
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
 spec:
-  type: NodePort
+  type: LoadBalancer
   ports:
   - port: 80
     targetPort: 8888
-    nodePort: 31314
   selector:
     svc: router
 
@@ -1525,43 +454,29 @@ apiVersion: v1
 kind: Service
 metadata:
   name: controller
+  namespace: fission
   labels:
     svc: controller
     application: fission-api
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
   - port: 80
     targetPort: 8888
-    nodePort: 31313
   selector:
     svc: controller
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: nats-streaming
-  labels:
-    svc: nats-streaming
-    chart: "fission-all-1.8.0"
-spec:
-  type: NodePort
-  ports:
-  - port: 4222
-    targetPort: 4222
-    nodePort: 31316
-  selector:
-    svc: nats-streaming
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: storagesvc
+  namespace: fission
   labels:
     svc: storagesvc
     application: fission-storage
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
 spec:
   type: ClusterIP
   ports:
@@ -1575,9 +490,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: executor
+  namespace: fission
   labels:
     svc: executor
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
 spec:
   type: ClusterIP
   ports:
@@ -1587,349 +503,14 @@ spec:
     svc: executor
 
 ---
-# Source: fission-all/charts/prometheus/templates/node-exporter-daemonset.yaml
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  labels:
-    component: "node-exporter"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-node-exporter
-spec:
-  selector:
-    matchLabels:
-      component: "node-exporter"
-      app: prometheus
-      release: fission-1-8-0
-  updateStrategy:
-    type: RollingUpdate
-
-  template:
-    metadata:
-      labels:
-        component: "node-exporter"
-        app: prometheus
-        release: fission-1-8-0
-        chart: prometheus-9.3.1
-        heritage: Tiller
-    spec:
-      serviceAccountName: fission-1-8-0-prometheus-node-exporter
-      containers:
-        - name: prometheus-node-exporter
-          image: "prom/node-exporter:v0.18.0"
-          imagePullPolicy: "IfNotPresent"
-          args:
-            - --path.procfs=/host/proc
-            - --path.sysfs=/host/sys
-          ports:
-            - name: metrics
-              containerPort: 9100
-              hostPort: 9100
-          resources:
-            {}
-
-          volumeMounts:
-            - name: proc
-              mountPath: /host/proc
-              readOnly:  true
-            - name: sys
-              mountPath: /host/sys
-              readOnly: true
-      hostNetwork: true
-      hostPID: true
-      volumes:
-        - name: proc
-          hostPath:
-            path: /proc
-        - name: sys
-          hostPath:
-            path: /sys
----
-# Source: fission-all/charts/prometheus/templates/alertmanager-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    component: "alertmanager"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-alertmanager
-spec:
-  selector:
-    matchLabels:
-      component: "alertmanager"
-      app: prometheus
-      release: fission-1-8-0
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        component: "alertmanager"
-        app: prometheus
-        release: fission-1-8-0
-        chart: prometheus-9.3.1
-        heritage: Tiller
-    spec:
-      serviceAccountName: fission-1-8-0-prometheus-alertmanager
-      containers:
-        - name: prometheus-alertmanager
-          image: "prom/alertmanager:v0.18.0"
-          imagePullPolicy: "IfNotPresent"
-          env:
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: status.podIP
-          args:
-            - --config.file=/etc/config/alertmanager.yml
-            - --storage.path=/data
-            - --cluster.advertise-address=$(POD_IP):6783
-            - --web.external-url=/
-
-          ports:
-            - containerPort: 9093
-          readinessProbe:
-            httpGet:
-              path: /#/status
-              port: 9093
-            initialDelaySeconds: 30
-            timeoutSeconds: 30
-          resources:
-            {}
-
-          volumeMounts:
-            - name: config-volume
-              mountPath: /etc/config
-            - name: storage-volume
-              mountPath: "/data"
-              subPath: ""
-
-        - name: prometheus-alertmanager-configmap-reload
-          image: "jimmidyson/configmap-reload:v0.2.2"
-          imagePullPolicy: "IfNotPresent"
-          args:
-            - --volume-dir=/etc/config
-            - --webhook-url=http://127.0.0.1:9093/-/reload
-          resources:
-            {}
-
-          volumeMounts:
-            - name: config-volume
-              mountPath: /etc/config
-              readOnly: true
-      securityContext:
-        fsGroup: 65534
-        runAsGroup: 65534
-        runAsNonRoot: true
-        runAsUser: 65534
-
-      volumes:
-        - name: config-volume
-          configMap:
-            name: fission-1-8-0-prometheus-alertmanager
-        - name: storage-volume
-          persistentVolumeClaim:
-            claimName: fission-1-8-0-prometheus-alertmanager
-
----
-# Source: fission-all/charts/prometheus/templates/kube-state-metrics-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    component: "kube-state-metrics"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-kube-state-metrics
-spec:
-  selector:
-    matchLabels:
-      component: "kube-state-metrics"
-      app: prometheus
-      release: fission-1-8-0
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        component: "kube-state-metrics"
-        app: prometheus
-        release: fission-1-8-0
-        chart: prometheus-9.3.1
-        heritage: Tiller
-    spec:
-      serviceAccountName: fission-1-8-0-prometheus-kube-state-metrics
-      containers:
-        - name: prometheus-kube-state-metrics
-          image: "quay.io/coreos/kube-state-metrics:v1.6.0"
-          imagePullPolicy: "IfNotPresent"
-          ports:
-            - name: metrics
-              containerPort: 8080
-          resources:
-            {}
-
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-
-
----
-# Source: fission-all/charts/prometheus/templates/pushgateway-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    component: "pushgateway"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-pushgateway
-spec:
-  selector:
-    matchLabels:
-      component: "pushgateway"
-      app: prometheus
-      release: fission-1-8-0
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        component: "pushgateway"
-        app: prometheus
-        release: fission-1-8-0
-        chart: prometheus-9.3.1
-        heritage: Tiller
-    spec:
-      serviceAccountName: fission-1-8-0-prometheus-pushgateway
-      containers:
-        - name: prometheus-pushgateway
-          image: "prom/pushgateway:v0.8.0"
-          imagePullPolicy: "IfNotPresent"
-          args:
-          ports:
-            - containerPort: 9091
-          readinessProbe:
-            httpGet:
-              path: /#/status
-              port: 9091
-            initialDelaySeconds: 10
-            timeoutSeconds: 10
-          resources:
-            {}
-
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-
-
----
-# Source: fission-all/charts/prometheus/templates/server-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    component: "server"
-    app: prometheus
-    release: fission-1-8-0
-    chart: prometheus-9.3.1
-    heritage: Tiller
-  name: fission-1-8-0-prometheus-server
-spec:
-  selector:
-    matchLabels:
-      component: "server"
-      app: prometheus
-      release: fission-1-8-0
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        component: "server"
-        app: prometheus
-        release: fission-1-8-0
-        chart: prometheus-9.3.1
-        heritage: Tiller
-    spec:
-      serviceAccountName: fission-1-8-0-prometheus-server
-      containers:
-        - name: prometheus-server-configmap-reload
-          image: "jimmidyson/configmap-reload:v0.2.2"
-          imagePullPolicy: "IfNotPresent"
-          args:
-            - --volume-dir=/etc/config
-            - --webhook-url=http://127.0.0.1:9090/-/reload
-          resources:
-            {}
-
-          volumeMounts:
-            - name: config-volume
-              mountPath: /etc/config
-              readOnly: true
-
-        - name: prometheus-server
-          image: "prom/prometheus:v2.13.1"
-          imagePullPolicy: "IfNotPresent"
-          args:
-            - --storage.tsdb.retention.time=15d
-            - --config.file=/etc/config/prometheus.yml
-            - --storage.tsdb.path=/data
-            - --web.console.libraries=/etc/prometheus/console_libraries
-            - --web.console.templates=/etc/prometheus/consoles
-            - --web.enable-lifecycle
-          ports:
-            - containerPort: 9090
-          readinessProbe:
-            httpGet:
-              path: /-/ready
-              port: 9090
-            initialDelaySeconds: 30
-            timeoutSeconds: 30
-          livenessProbe:
-            httpGet:
-              path: /-/healthy
-              port: 9090
-            initialDelaySeconds: 30
-            timeoutSeconds: 30
-          resources:
-            {}
-
-          volumeMounts:
-            - name: config-volume
-              mountPath: /etc/config
-            - name: storage-volume
-              mountPath: /data
-              subPath: ""
-      securityContext:
-        fsGroup: 65534
-        runAsGroup: 65534
-        runAsNonRoot: true
-        runAsUser: 65534
-
-      terminationGracePeriodSeconds: 300
-      volumes:
-        - name: config-volume
-          configMap:
-            name: fission-1-8-0-prometheus-server
-        - name: storage-volume
-          persistentVolumeClaim:
-            claimName: fission-1-8-0-prometheus-server
----
-# Source: fission-all/templates/router.yaml
+# Source: fission-core/templates/router.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: router
+  namespace: fission
   labels:
-    chart: "fission-all-1.8.0"
+    chart: "fission-core-1.8.0"
     svc: router
     application: fission-router
 spec:
@@ -2006,49 +587,50 @@ spec:
       serviceAccountName: fission-svc
 
 ---
-# Source: fission-all/templates/nonhelm-install-job.yaml
+# Source: fission-core/templates/nonhelm-install-job.yaml
 
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: fission-1-8-0-fission-al-1.8.0-353
+  name: fission-1-8-0-fission-co-1.8.0-182
+  namespace: fission
   labels:
     # The "release" convention makes it easy to tie a release to all of the
     # Kubernetes resources that were created as part of that release.
     release: fission-1-8-0
     # This makes it easy to audit chart usage.
-    chart: fission-all-1.8.0
-    app: fission-all
+    chart: fission-core-1.8.0
+    app: fission-core
 spec:
   #ttlSecondsAfterFinished: 120
   template:
     metadata:
-      name: fission-1-8-0-fission-al
+      name: fission-1-8-0-fission-co
       labels:
         release: fission-1-8-0
-        app: fission-all
+        app: fission-core
       annotations:
     spec:
       restartPolicy: Never
       containers:
         - name: post-install-job
           image: "fission/alpinecurl"
-          imagePullPolicy: IfNotPresent
-          command: ["sh", "-c", "/usr/bin/curl -m 5 -H \"Content-Type: application/json\" -X POST -d '{\"type\": \"yaml-post-install\", \"chartName\": \"fission-all\", \"chartVersion\": \"1.8.0\"}' https://g.fission.io/analytics || true"]
+          command: ["sh", "-c", "/usr/bin/curl -m 5 -H \"Content-Type: application/json\" -X POST -d '{\"type\": \"yaml-post-install\", \"chartName\": \"fission-core\", \"chartVersion\": \"1.8.0\"}' https://g.fission.io/analytics || true"]
 
 ---
-# Source: fission-all/templates/pre-upgrade-job.yaml
+# Source: fission-core/templates/pre-upgrade-job.yaml
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: fission-1-8-0-fission-al-1.8.0-723
+  name: fission-1-8-0-fission-co-1.8.0-480
+  namespace: fission
   labels:
     # The "release" convention makes it easy to tie a release to all of the
     # Kubernetes resources that were created as part of that release.
     release: "fission-1-8-0"
     # This makes it easy to audit chart usage.
-    chart: fission-all-1.8.0
-    app: fission-all
+    chart: fission-core-1.8.0
+    app: fission-core
   annotations:
     # This is what defines this resource as a hook. Without this line, the
     # job is considered part of the release.
@@ -2058,10 +640,10 @@ spec:
   backoffLimit: 0
   template:
     metadata:
-      name: fission-1-8-0-fission-al
+      name: fission-1-8-0-fission-co
       labels:
         release: "fission-1-8-0"
-        app: fission-all
+        app: fission-core
     spec:
       restartPolicy: Never
       containers:
@@ -2073,76 +655,8 @@ spec:
       serviceAccountName: fission-svc
 
 ---
-# Source: fission-all/charts/prometheus/templates/alertmanager-ingress.yaml
-
----
-# Source: fission-all/charts/prometheus/templates/alertmanager-networkpolicy.yaml
-
----
-# Source: fission-all/charts/prometheus/templates/alertmanager-podsecuritypolicy.yaml
+# Source: fission-core/templates/post-install-job.yaml
 
 
 ---
-# Source: fission-all/charts/prometheus/templates/alertmanager-service-headless.yaml
-
-
----
-# Source: fission-all/charts/prometheus/templates/alertmanager-statefulset.yaml
-
-
----
-# Source: fission-all/charts/prometheus/templates/kube-state-metrics-networkpolicy.yaml
-
----
-# Source: fission-all/charts/prometheus/templates/kube-state-metrics-podsecuritypolicy.yaml
-
-
----
-# Source: fission-all/charts/prometheus/templates/node-exporter-podsecuritypolicy.yaml
-
-
----
-# Source: fission-all/charts/prometheus/templates/node-exporter-role.yaml
-
-
----
-# Source: fission-all/charts/prometheus/templates/node-exporter-rolebinding.yaml
-
-
----
-# Source: fission-all/charts/prometheus/templates/pushgateway-ingress.yaml
-
----
-# Source: fission-all/charts/prometheus/templates/pushgateway-networkpolicy.yaml
-
----
-# Source: fission-all/charts/prometheus/templates/pushgateway-podsecuritypolicy.yaml
-
-
----
-# Source: fission-all/charts/prometheus/templates/pushgateway-pvc.yaml
-
----
-# Source: fission-all/charts/prometheus/templates/server-ingress.yaml
-
----
-# Source: fission-all/charts/prometheus/templates/server-networkpolicy.yaml
-
-
----
-# Source: fission-all/charts/prometheus/templates/server-podsecuritypolicy.yaml
-
-
----
-# Source: fission-all/charts/prometheus/templates/server-service-headless.yaml
-
----
-# Source: fission-all/charts/prometheus/templates/server-statefulset.yaml
-
-
----
-# Source: fission-all/templates/post-install-job.yaml
-
-
----
-# Source: fission-all/templates/post-upgrade-job.yaml
+# Source: fission-core/templates/post-upgrade-job.yaml

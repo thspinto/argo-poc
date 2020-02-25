@@ -60,19 +60,41 @@ References:
 
 1. Triggering events using argo events
 
-  * Show integration with Workflows (Github webhook)
+  * Show integration with Workflows
+
 ```bash
 kubectl -n argo-events -f http-workflow-sensor.yaml
 kubectl -n port-forward svc/webhook-gateway-svc 12000:12000
 curl -d '{"message":"this is my first webhook"}' -H "Content-Type: application/json" -X POST http://localhost:12000/example
 ```
+
 To check the workflow status and logs run:
+
 ```bash
 argo list -n argo-events
 argo -n argo-events logs <workflow-id>
 ```
 
-  * Show integration with Fission (Kafka or SQS)
+  * Show integration with Fission
+
+Spin up a [simple Fission function](https://docs.fission.io/docs/#usage)
+
+```
+# Add the stock NodeJS env to your Fission deployment
+fission env create --name nodejs --image fission/node-env
+
+# Upload your function code to fission
+fission function create --name hello --env nodejs --code hello.js
+
+# Map GET /hello to your new function
+fission route create --method GET --url /hello --function hello
+```
+
+  * Github Webhook
+
+  * Kafka
+
+  * SQS
 
 
 1. Global CI pipelines
@@ -83,3 +105,10 @@ argo -n argo-events logs <workflow-id>
 1. Scheduled jobs
 
   * Trigger a daemons job using argo events
+
+
+## Productizing
+
+* Use helm charts to simplify events and workflows deployments
+
+* Drone file to workflow conversion?
